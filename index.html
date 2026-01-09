@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Media Sharing Platform</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Azure Storage Blob SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@azure/storage-blob@12.20.0/dist/azure-storage-blob.min.js" onerror="console.error('Failed to load Azure Storage Blob SDK')"></script>
+  <!-- Axios for HTTP requests -->
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+</head>
+<body>
+  <!-- Configuration Panel -->
+  <div id="configPanel" class="config-panel">
+    <div class="config-header">
+      <span>⚙️ Settings</span>
+      <button id="toggleConfig" class="icon-btn">✕</button>
+    </div>
+    <div class="config-content">
+      <div class="config-item">
+        <label>API Base URL</label>
+        <input type="text" id="apiBase" placeholder="https://your-function-app.azurewebsites.net">
+      </div>
+      <div class="config-item">
+        <label>API Key</label>
+        <input type="password" id="apiKey" placeholder="Your API Key">
+      </div>
+      <button id="saveCfg" class="btn-primary">Save</button>
+    </div>
+  </div>
+
+  <!-- Sidebar Layout -->
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <span class="logo-icon">📸</span>
+          <span class="logo-text">Media Gallery</span>
+        </div>
+        <button id="openConfig" class="icon-btn sidebar-icon" title="Settings">⚙️</button>
+      </div>
+      
+      <div class="sidebar-content">
+        <!-- Upload Section in Sidebar -->
+        <div class="sidebar-section">
+          <h3 class="sidebar-title">Upload</h3>
+          <input type="file" id="fileInput" multiple accept="image/*,video/*,.pdf,.doc,.docx" style="display: none;">
+          <button id="uploadBtnHeader" class="btn-upload-full">+ Upload Files</button>
+          <div id="dropzone" class="dropzone-compact">
+            <div class="dropzone-icon">📁</div>
+            <p class="dropzone-text-compact">Drag & drop files here</p>
+          </div>
+        </div>
+
+        <!-- Filters in Sidebar -->
+        <div class="sidebar-section">
+          <h3 class="sidebar-title">Filter</h3>
+          <select id="filterSelect" class="filter-select-full">
+            <option value="all">All Files</option>
+            <option value="image">Images Only</option>
+            <option value="video">Videos Only</option>
+            <option value="document">Documents Only</option>
+          </select>
+        </div>
+
+        <!-- Sort in Sidebar -->
+        <div class="sidebar-section">
+          <h3 class="sidebar-title">Sort By</h3>
+          <select id="sortSelect" class="sort-select-full">
+            <option value="created_at_desc">Newest First</option>
+            <option value="created_at_asc">Oldest First</option>
+            <option value="name_asc">Name A-Z</option>
+            <option value="name_desc">Name Z-A</option>
+            <option value="size_desc">Size Large→Small</option>
+            <option value="size_asc">Size Small→Large</option>
+          </select>
+        </div>
+
+        <!-- View Toggle in Sidebar -->
+        <div class="sidebar-section">
+          <h3 class="sidebar-title">View</h3>
+          <div class="view-toggle-vertical">
+            <button id="gridViewBtn" class="view-btn-vertical active" data-view="grid">
+              <span class="view-icon">⊞</span>
+              <span>Grid</span>
+            </button>
+            <button id="listViewBtn" class="view-btn-vertical" data-view="list">
+              <span class="view-icon">☰</span>
+              <span>List</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Actions in Sidebar -->
+        <div class="sidebar-section">
+          <button id="batchModeBtn" class="btn-secondary-full">Batch Mode</button>
+          <button id="refreshBtn" class="btn-secondary-full">🔄 Refresh</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content-layout">
+      <!-- Top Bar with Search -->
+      <div class="top-bar">
+        <div class="search-container">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="searchInput" placeholder="Search files..." class="search-input-full">
+          <button id="clearSearch" class="clear-btn" style="display: none;">✕</button>
+        </div>
+      </div>
+
+      <!-- Batch Toolbar -->
+      <div id="batchToolbar" class="batch-toolbar-top" style="display: none;">
+        <span id="selectedCount">Selected 0 items</span>
+        <div class="batch-actions">
+          <button id="selectAllBtn" class="btn-link">Select All</button>
+          <button id="batchDeleteBtn" class="btn-danger">Delete Selected</button>
+          <button id="cancelBatchBtn" class="btn-link">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Upload Preview and Progress -->
+      <div id="uploadPreview" class="upload-preview-main"></div>
+      <div id="progressList" class="progress-list-main"></div>
+
+      <!-- Content Grid -->
+      <div class="content-wrapper">
+        <div id="assets" class="assets-grid"></div>
+        <div id="emptyState" class="empty-state" style="display: none;">
+          <div class="empty-icon">📭</div>
+          <p class="empty-text">No content yet, upload your first photo!</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Image Preview Modal -->
+  <div id="imageModal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content image-modal-content">
+      <button class="modal-close">✕</button>
+      <div class="modal-image-container">
+        <img id="previewImage" src="" alt="Preview">
+        <button class="modal-nav prev" id="prevImage">‹</button>
+        <button class="modal-nav next" id="nextImage">›</button>
+      </div>
+      <div class="modal-info">
+        <div class="modal-header">
+          <h3 id="previewTitle"></h3>
+          <div class="modal-actions">
+            <button class="btn-icon" id="favoriteBtn" title="Favorite">❤️</button>
+            <button class="btn-icon" id="shareBtn" title="Share">🔗</button>
+            <button class="btn-icon" id="downloadBtn" title="Download">⬇️</button>
+            <button class="btn-icon" id="editBtn" title="Edit">✏️</button>
+            <button class="btn-icon danger" id="deleteBtn" title="Delete">🗑️</button>
+          </div>
+        </div>
+        <div class="modal-details">
+          <div class="detail-item">
+            <span class="detail-label">File Size</span>
+            <span id="previewSize" class="detail-value"></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Upload Time</span>
+            <span id="previewDate" class="detail-value"></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">File Type</span>
+            <span id="previewType" class="detail-value"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content edit-modal-content">
+      <div class="modal-header">
+        <h3>Edit Information</h3>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="edit-form">
+        <div class="form-group">
+          <label>File Name</label>
+          <input type="text" id="editFileName" class="form-input">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="editDescription" class="form-textarea" placeholder="Add description..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Tags</label>
+          <input type="text" id="editTags" class="form-input" placeholder="Separate multiple tags with commas">
+        </div>
+        <div class="form-actions">
+          <button class="btn-secondary" id="cancelEdit">Cancel</button>
+          <button class="btn-primary" id="saveEdit">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
