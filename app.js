@@ -9,7 +9,7 @@
 
   const el = (id) => document.getElementById(id);
   const qs = (sel) => document.querySelector(sel);
-  const qsAll = (sel) => document.querySelectorAll(sel);
+  ;
 
   const state = {
     apiBase: localStorage.getItem('apiBase') || '',
